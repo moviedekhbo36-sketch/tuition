@@ -37,22 +37,22 @@ const predefinedTemplates = [
   {
     id: "attendance",
     name: "উপস্থিতি সতর্কতা",
-    template: "Dear Guardian,\n[Student] was absent for [Days] days in [Month].",
+    template: "Dear Guardian,\n[Student] was absent for [Days] days in [Month].\nPlease ensure regular attendance.\nRegards,\nAST Tuition",
   },
   {
     id: "payment",
     name: "পেমেন্ট নিশ্চয়তা",
-    template: "Dear Guardian,\nPayment received for [Student]\nMonth: [Month] [Year]\nAmount: [Amount] BDT.Thanks",
+    template: "Dear Guardian,\nPayment received for [Student]\nMonth: [Month] [Year]\nAmount: [Amount] BDT\n\nThank you for your payment.\n\nBest Regards,\nAST Tuition",
   },
   {
     id: "general",
     name: "প্রাইভেট বন্ধ",
-    template: "Dear Student,\nPrivate tutoring will remain closed tomorrow.",
+    template: "Dear Student,\nPrivate tutoring will remain closed tomorrow.\n\nBest Regards,\nAST Tuition",
   },
   {
     id: "holiday",
     name: "ছুটি ঘোষণা",
-    template: "Dear Students,\nClasses will remain closed on [Date].",
+    template: "Dear Students,\nClasses will remain closed on [Date].\n\nBest Regards,\nAST Tuition",
   },
 ];
 export function BulkSMS() {
