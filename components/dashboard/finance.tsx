@@ -83,6 +83,7 @@ export function FinanceSystem() {
   const [isPaymentConfirmOpen, setIsPaymentConfirmOpen] = useState(false);
   const [revertPaymentId, setRevertPaymentId] = useState<string | null>(null);
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
 
   const [expenseForm, setExpenseForm] = useState({
     category: "",
@@ -124,13 +125,14 @@ export function FinanceSystem() {
 
   // Get payment status for students
   const getPaymentStatus = (studentId: string) => {
-    const hasPaid = payments.some(
+    const studentPayments = payments.filter(
       (p) =>
         p.studentId === studentId &&
         p.month === selectedMonth &&
         p.year === selectedYear
     );
-    return hasPaid;
+    const totalPaid = studentPayments.reduce((sum, p) => sum + p.amount, 0);
+    return { isPaid: totalPaid > 0, amount: totalPaid, payments: studentPayments };
   };
 
   const filteredStudents = useMemo(() => {
@@ -141,38 +143,40 @@ export function FinanceSystem() {
 
   const handleAddPayment = (student: Student) => {
     setPaymentConfirmStudent(student);
+    setPaymentAmount(student.monthlyFee);
     setIsPaymentConfirmOpen(true);
   };
 
   const confirmAddPayment = async () => {
-    if (!paymentConfirmStudent) return;
+    if (!paymentConfirmStudent || paymentAmount <= 0) return;
     await addPayment({
       studentId: paymentConfirmStudent.id,
-      amount: paymentConfirmStudent.monthlyFee,
+      amount: paymentAmount,
       month: selectedMonth,
       year: selectedYear,
       paidDate: new Date().toISOString(),
     });
     setIsPaymentConfirmOpen(false);
     setPaymentConfirmStudent(null);
+    setPaymentAmount(0);
   };
 
-  const getPaymentRecord = (studentId: string) =>
-    payments.find(
-      (p) =>
-        p.studentId === studentId &&
-        p.month === selectedMonth &&
-        p.year === selectedYear
-    );
-
-  const handleRevertPayment = (paymentId: string) => {
-    setRevertPaymentId(paymentId);
+  const handleRevertPayment = (studentId: string) => {
+    setRevertPaymentId(studentId);
     setIsRevertDialogOpen(true);
   };
 
   const confirmRevertPayment = async () => {
     if (!revertPaymentId) return;
-    await deletePayment(revertPaymentId);
+    const studentPayments = payments.filter(
+      (p) =>
+        p.studentId === revertPaymentId &&
+        p.month === selectedMonth &&
+        p.year === selectedYear
+    );
+    for (const payment of studentPayments) {
+      await deletePayment(payment.id);
+    }
     setIsRevertDialogOpen(false);
     setRevertPaymentId(null);
   };
@@ -190,14 +194,8 @@ export function FinanceSystem() {
   };
 
   const generateReceipt = async (student: Student) => {
-    const payment = payments.find(
-      (p) =>
-        p.studentId === student.id &&
-        p.month === selectedMonth &&
-        p.year === selectedYear
-    );
-
-    if (!payment) return;
+    const paymentStatus = getPaymentStatus(student.id);
+    if (paymentStatus.amount === 0) return;
 
     const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF();
@@ -214,8 +212,8 @@ export function FinanceSystem() {
 
     // Receipt details
     pdf.setFontSize(12);
-    pdf.text(`Receipt No: ${payment.id.slice(-8).toUpperCase()}`, 20, 55);
-    pdf.text(`Date: ${format(parseISO(payment.paidDate), "dd/MM/yyyy")}`, 20, 65);
+    pdf.text(`Receipt No: ${paymentStatus.payments[0]?.id.slice(-8).toUpperCase()}`, 20, 55);
+    pdf.text(`Date: ${format(parseISO(paymentStatus.payments[0]?.paidDate || new Date().toISOString()), "dd/MM/yyyy")}`, 20, 65);
 
     // Student Info
     pdf.text(`Student Name: ${student.name}`, 20, 85);
@@ -225,7 +223,7 @@ export function FinanceSystem() {
     // Payment Details
     pdf.setFontSize(14);
     pdf.text(`Payment For: ${englishMonth} ${selectedYear}`, 20, 125);
-    pdf.text(`Amount Paid: ${payment.amount} Taka`, 20, 140);
+    pdf.text(`Amount Paid: ${paymentStatus.amount} Taka`, 20, 140);
 
     // Footer
     pdf.setFontSize(10);
@@ -236,13 +234,15 @@ export function FinanceSystem() {
   };
 
   const sendPaymentMessage = (student: Student) => {
+    const paymentStatus = getPaymentStatus(student.id);
+    const amount = paymentStatus.amount;
     const monthName = months.find((m) => m.value === selectedMonth)?.label || selectedMonth;
     const englishMonthIndex = parseInt(selectedMonth) - 1;
     const englishMonth = new Date(2024, englishMonthIndex).toLocaleString('en-US', { month: 'long' });
     
     // English pre-filled message
     const message = encodeURIComponent(
-      `Dear Guardian,\nPayment received for ${student.name}\nMonth: ${englishMonth} ${selectedYear}\nAmount: ${student.monthlyFee} BDT\n\nThank you for your payment.\n\nBest Regards,\nAST Tuition`
+      `Dear Guardian,\nPayment of TK ${amount} received for ${student.name} (${englishMonth},${selectedYear})\nThanks.`
     );
     window.location.href = `sms:${student.guardianPhone}?body=${message}`;
   };
@@ -356,7 +356,9 @@ export function FinanceSystem() {
 
           <div className="space-y-3">
             {filteredStudents.map((student) => {
-              const isPaid = getPaymentStatus(student.id);
+              const paymentStatus = getPaymentStatus(student.id);
+              const isPaid = paymentStatus.isPaid;
+              const paidAmount = paymentStatus.amount;
 
               return (
                 <Card key={student.id} className="border-border/50">
@@ -381,10 +383,10 @@ export function FinanceSystem() {
                             <h3 className="font-semibold">{student.name}</h3>
                             {isPaid ? (
                               <Badge className="bg-chart-2/20 text-chart-2 border-chart-2/30">
-                                Paid
+                                Paid: ৳{paidAmount}
                               </Badge>
                             ) : (
-                              <Badge variant="destructive">Due</Badge>
+                              <Badge variant="destructive">Due: ৳{student.monthlyFee}</Badge>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -393,7 +395,14 @@ export function FinanceSystem() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isPaid ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleAddPayment(student)}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          {isPaid ? "আরও পেমেন্ট" : "পেমেন্ট নিন"}
+                        </Button>
+                        {isPaid && (
                           <>
                             <Button
                               variant="outline"
@@ -414,23 +423,12 @@ export function FinanceSystem() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                const payment = getPaymentRecord(student.id);
-                                if (payment) handleRevertPayment(payment.id);
-                              }}
+                              onClick={() => handleRevertPayment(student.id)}
                             >
                               <Trash2 className="w-4 h-4 mr-1" />
                               রিভার্ট
                             </Button>
                           </>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddPayment(student)}
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            পেমেন্ট নিন
-                          </Button>
                         )}
                       </div>
                     </div>
@@ -445,12 +443,33 @@ export function FinanceSystem() {
               <AlertDialogHeader>
                 <AlertDialogTitle>পেমেন্ট নিশ্চিত করুন</AlertDialogTitle>
                 <AlertDialogDescription>
-                  আপনি কি নিশ্চিত যে এই শিক্ষার্থীর মাসিক ফি গ্রহণ করতে চান?
+                  {paymentConfirmStudent?.name} এর জন্য পেমেন্টের পরিমাণ নির্ধারণ করুন
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="space-y-4">
+                <Field>
+                  <FieldLabel>পেমেন্টের পরিমাণ (টাকা)</FieldLabel>
+                  <Input
+                    type="number"
+                    value={paymentAmount || ""}
+                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                    placeholder="পরিমাণ লিখুন"
+                    min="1"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    মাসিক ফি: ৳{paymentConfirmStudent?.monthlyFee}
+                  </p>
+                </Field>
+              </div>
               <AlertDialogFooter>
-                <AlertDialogCancel>বাতিল</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmAddPayment}>
+                <AlertDialogCancel onClick={() => {
+                  setPaymentAmount(0);
+                  setPaymentConfirmStudent(null);
+                }}>
+                  বাতিল
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={confirmAddPayment} disabled={paymentAmount <= 0}>
                   নিশ্চিত করুন
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -462,11 +481,11 @@ export function FinanceSystem() {
               <AlertDialogHeader>
                 <AlertDialogTitle>পেমেন্ট রিভার্ট করুন</AlertDialogTitle>
                 <AlertDialogDescription>
-                  আপনি কি নিশ্চিত যে এই পেমেন্টকে ডিউ হিসেবে ফেরত আনতে চান?
+                  আপনি কি নিশ্চিত যে এই মাসের সব পেমেন্টকে ডিউ হিসেবে ফেরত আনতে চান?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>না</AlertDialogCancel>
+                <AlertDialogCancel onClick={() => setRevertPaymentId(null)}>না</AlertDialogCancel>
                 <AlertDialogAction onClick={confirmRevertPayment}>
                   হ্যাঁ, ফেরত আনুন
                 </AlertDialogAction>

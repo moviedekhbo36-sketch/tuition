@@ -37,17 +37,22 @@ const predefinedTemplates = [
   {
     id: "attendance",
     name: "উপস্থিতি সতর্কতা",
-    template: "Dear Guardian,\n[Student] was absent for [Days] days in [Month].\nPlease ensure regular attendance.\nRegards,\nAST Tuition",
+    template: "Dear Guardian,\n[Student] was absent for [Days] days in [Month].",
   },
   {
     id: "payment",
     name: "পেমেন্ট নিশ্চয়তা",
-    template: "Dear Guardian,\nPayment received for [Student]\nMonth: [Month] [Year]\nAmount: [Amount] BDT\n\nThank you for your payment.\n\nBest Regards,\nAST Tuition",
+    template: "Dear Guardian,\nPayment received for [Student]\nMonth: [Month] [Year]\nAmount: [Amount] BDT.Thanks",
   },
   {
     id: "general",
-    name: "সাধারণ বার্তা",
-    template: "Dear Guardian,\nThis is an important announcement for [Student].\n\nPlease reply at your earliest convenience.\n\nBest Regards,\nAST Tuition",
+    name: "প্রাইভেট বন্ধ",
+    template: "Dear Student,\nPrivate tutoring will remain closed tomorrow.",
+  },
+  {
+    id: "holiday",
+    name: "ছুটি ঘোষণা",
+    template: "Dear Students,\nClasses will remain closed on [Date].",
   },
 ];
 
@@ -76,11 +81,14 @@ export function BulkSMS() {
     }
 
     if (filterType === "class" && selectedClass) {
-      result = result.filter((s) => s.class === selectedClass);
+      const selectedClassObj = classes.find((c) => c.id === selectedClass);
+      if (selectedClassObj) {
+        result = result.filter((s) => s.class === selectedClassObj.name);
+      }
     }
 
     return result;
-  }, [activeStudents, filterType, selectedBatch, selectedClass]);
+  }, [activeStudents, filterType, selectedBatch, selectedClass, classes]);
 
   // Get phone numbers for selected students
   const selectedPhones = useMemo(() => {

@@ -8,6 +8,7 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type {
@@ -31,6 +32,7 @@ interface FirebaseContextType {
 
   attendance: Attendance[];
   markAttendance: (studentId: string, date: string, status: "present" | "absent") => Promise<void>;
+  clearAttendance: (studentId: string, date: string) => Promise<void>;
   getAttendanceByStudent: (studentId: string) => Attendance[];
   getAttendanceByDate: (date: string) => Attendance[];
 
@@ -134,10 +136,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const updateStudent = async (id: string, data: Partial<Student>) => {
     const updatedData = { ...data, updatedAt: new Date().toISOString() };
-    
-    await updateDoc(doc(db, "students", id), updatedData);
-    
-    const updated = students.map((s) => (s.id === id ? { ...s, ...updatedData } : s));
+    const cleanData = Object.fromEntries(
+      Object.entries(updatedData).filter(([, value]) => value !== undefined)
+    );
+
+    if (Object.keys(cleanData).length === 0) return;
+
+    await updateDoc(doc(db, "students", id), cleanData);
+
+    const updated = students.map((s) => (s.id === id ? { ...s, ...cleanData } : s));
     setStudents(updated);
   };
 
@@ -152,7 +159,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   };
 
   const restoreStudent = async (id: string) => {
-    await updateStudent(id, { isArchived: false, archiveYear: undefined });
+    await updateStudent(id, { isArchived: false, archiveYear: deleteField() });
   };
 
   // Attendance operations
@@ -168,6 +175,15 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const docRef = await addDoc(collection(db, "attendance"), { studentId, date, status, createdAt: now });
       const newAttendance = { id: docRef.id, studentId, date, status, createdAt: now };
       const updated = [...attendance, newAttendance];
+      setAttendance(updated);
+    }
+  };
+
+  const clearAttendance = async (studentId: string, date: string) => {
+    const existing = attendance.find((a) => a.studentId === studentId && a.date === date);
+    if (existing) {
+      await deleteDoc(doc(db, "attendance", existing.id));
+      const updated = attendance.filter((a) => a.id !== existing.id);
       setAttendance(updated);
     }
   };
@@ -281,6 +297,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         restoreStudent,
         attendance,
         markAttendance,
+        clearAttendance,
         getAttendanceByStudent,
         getAttendanceByDate,
         payments,

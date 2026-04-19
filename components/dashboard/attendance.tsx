@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Check,
   X,
+  RotateCcw,
   AlertTriangle,
   MessageSquare,
   Search,
@@ -26,7 +27,7 @@ import { format, parseISO, differenceInDays, startOfMonth, endOfMonth } from "da
 import { bn } from "date-fns/locale";
 
 export function AttendanceSystem() {
-  const { students, attendance, markAttendance, getAttendanceByStudent, classes } = useFirebase();
+  const { students, attendance, markAttendance, clearAttendance, getAttendanceByStudent, classes } = useFirebase();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [selectedClass, setSelectedClass] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,6 +96,10 @@ export function AttendanceSystem() {
     await markAttendance(studentId, selectedDate, status);
   };
 
+  const handleClearAttendance = async (studentId: string) => {
+    await clearAttendance(studentId, selectedDate);
+  };
+
   const handleSendAbsenceMessage = (student: typeof activeStudents[0]) => {
     const monthlyAbsent = getMonthlyAbsentCount(student.id);
     const currentMonth = format(new Date(), "MMMM");
@@ -110,9 +115,8 @@ export function AttendanceSystem() {
   const todayStats = useMemo(() => {
     const present = dateAttendance.filter((a) => a.status === "present").length;
     const absent = dateAttendance.filter((a) => a.status === "absent").length;
-    const unmarked = filteredStudents.length - present - absent;
-    return { present, absent, unmarked };
-  }, [dateAttendance, filteredStudents]);
+    return { present, absent };
+  }, [dateAttendance]);
 
   return (
     <div className="space-y-6">
@@ -157,7 +161,7 @@ export function AttendanceSystem() {
       </div>
 
       {/* Today's Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <Card className="border-chart-2/30 bg-chart-2/5">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-chart-2">{todayStats.present}</p>
@@ -168,12 +172,6 @@ export function AttendanceSystem() {
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-destructive">{todayStats.absent}</p>
             <p className="text-sm text-muted-foreground">অনুপস্থিত</p>
-          </CardContent>
-        </Card>
-        <Card className="border-muted-foreground/30 bg-muted/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-muted-foreground">{todayStats.unmarked}</p>
-            <p className="text-sm text-muted-foreground">বাকি</p>
           </CardContent>
         </Card>
       </div>
@@ -196,6 +194,7 @@ export function AttendanceSystem() {
                   const consecutiveAbsent = getConsecutiveAbsentDays(student.id);
                   const monthlyAbsent = getMonthlyAbsentCount(student.id);
                   const attendancePercent = getAttendancePercentage(student.id);
+                  const status = getStudentStatus(student.id);
 
                   return (
                     <Card
@@ -205,8 +204,24 @@ export function AttendanceSystem() {
                       <CardContent className="p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-destructive/20 flex items-center justify-center">
-                              <span className="text-lg font-bold text-destructive">
+                            <div
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                                status === "present"
+                                  ? "bg-chart-2/20"
+                                  : status === "absent"
+                                  ? "bg-destructive/20"
+                                  : "bg-destructive/20"
+                              }`}
+                            >
+                              <span
+                                className={`text-lg font-bold ${
+                                  status === "present"
+                                    ? "text-chart-2"
+                                    : status === "absent"
+                                    ? "text-destructive"
+                                    : "text-destructive"
+                                }`}
+                              >
                                 {student.name.charAt(0)}
                               </span>
                             </div>
@@ -220,14 +235,53 @@ export function AttendanceSystem() {
                               </p>
                             </div>
                           </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSendAbsenceMessage(student)}
-                            className="bg-destructive hover:bg-destructive/90 text-white"
-                          >
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            অভিভাবককে জানান
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant={status === "present" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleMarkAttendance(student.id, "present")}
+                              className={
+                                status === "present"
+                                  ? "bg-chart-2 hover:bg-chart-2/90"
+                                  : "hover:bg-chart-2/10 hover:text-chart-2 hover:border-chart-2"
+                              }
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              উপস্থিত
+                            </Button>
+                            <Button
+                              variant={status === "absent" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleMarkAttendance(student.id, "absent")}
+                              className={
+                                status === "absent"
+                                  ? "bg-destructive hover:bg-destructive/90"
+                                  : "hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                              }
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              অনুপস্থিত
+                            </Button>
+                            {status && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleClearAttendance(student.id)}
+                                className="hover:bg-muted hover:text-muted-foreground"
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                ক্লিয়ার
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              onClick={() => handleSendAbsenceMessage(student)}
+                              className="bg-destructive hover:bg-destructive/90 text-white"
+                            >
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              অভিভাবককে জানান
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -308,6 +362,17 @@ export function AttendanceSystem() {
                           <X className="w-4 h-4 mr-1" />
                           অনুপস্থিত
                         </Button>
+                        {status && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleClearAttendance(student.id)}
+                            className="hover:bg-muted hover:text-muted-foreground"
+                          >
+                            <RotateCcw className="w-4 h-4 mr-1" />
+                            ক্লিয়ার
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
