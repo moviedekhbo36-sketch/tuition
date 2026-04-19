@@ -84,6 +84,8 @@ export function FinanceSystem() {
   const [revertPaymentId, setRevertPaymentId] = useState<string | null>(null);
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentMonth, setPaymentMonth] = useState<string>(format(new Date(), "MM"));
+  const [paymentYear, setPaymentYear] = useState<number>(new Date().getFullYear());
 
   const [expenseForm, setExpenseForm] = useState({
     category: "",
@@ -144,6 +146,8 @@ export function FinanceSystem() {
   const handleAddPayment = (student: Student) => {
     setPaymentConfirmStudent(student);
     setPaymentAmount(student.monthlyFee);
+    setPaymentMonth(selectedMonth);
+    setPaymentYear(selectedYear);
     setIsPaymentConfirmOpen(true);
   };
 
@@ -152,13 +156,15 @@ export function FinanceSystem() {
     await addPayment({
       studentId: paymentConfirmStudent.id,
       amount: paymentAmount,
-      month: selectedMonth,
-      year: selectedYear,
+      month: paymentMonth,
+      year: paymentYear,
       paidDate: new Date().toISOString(),
     });
     setIsPaymentConfirmOpen(false);
     setPaymentConfirmStudent(null);
     setPaymentAmount(0);
+    setPaymentMonth(format(new Date(), "MM"));
+    setPaymentYear(new Date().getFullYear());
   };
 
   const handleRevertPayment = (studentId: string) => {
@@ -461,11 +467,48 @@ export function FinanceSystem() {
                     মাসিক ফি: ৳{paymentConfirmStudent?.monthlyFee}
                   </p>
                 </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel>মাস</FieldLabel>
+                    <Select value={paymentMonth} onValueChange={setPaymentMonth}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel>সাল</FieldLabel>
+                    <Select
+                      value={paymentYear.toString()}
+                      onValueChange={(v) => setPaymentYear(Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                          <SelectItem key={y} value={y.toString()}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
               </div>
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => {
                   setPaymentAmount(0);
                   setPaymentConfirmStudent(null);
+                  setPaymentMonth(format(new Date(), "MM"));
+                  setPaymentYear(new Date().getFullYear());
                 }}>
                   বাতিল
                 </AlertDialogCancel>
