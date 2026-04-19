@@ -55,7 +55,6 @@ const predefinedTemplates = [
     template: "Dear Students,\nClasses will remain closed on [Date].",
   },
 ];
-
 export function BulkSMS() {
   const { students, classes } = useFirebase();
   const [filterType, setFilterType] = useState<"batch" | "class">("batch");
