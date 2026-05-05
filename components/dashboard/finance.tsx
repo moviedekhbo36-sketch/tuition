@@ -70,13 +70,16 @@ const expenseCategories = [
 ];
 
 export function FinanceSystem() {
-  const { students, payments, expenses, addPayment, addExpense, deleteExpense, deletePayment } =
+  const { students, payments, expenses, classes, addPayment, addExpense, deleteExpense, deletePayment } =
     useFirebase();
 
   const [activeTab, setActiveTab] = useState("payments");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "MM"));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [filterClass, setFilterClass] = useState<string>("all");
+  const [filterBatch, setFilterBatch] = useState<string>("all");
+  const [filterPayment, setFilterPayment] = useState<string>("all");
 
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [paymentConfirmStudent, setPaymentConfirmStudent] = useState<Student | null>(null);
@@ -134,14 +137,43 @@ export function FinanceSystem() {
         p.year === selectedYear
     );
     const totalPaid = studentPayments.reduce((sum, p) => sum + p.amount, 0);
-    return { isPaid: totalPaid > 0, amount: totalPaid, payments: studentPayments };
+    const isPaid = totalPaid > 0;
+    
+    // Determine status
+    let status: "paid" | "due" | "pending" = "pending";
+    if (isPaid) {
+      status = "paid";
+    } else {
+      const today = new Date();
+      const dayOfMonth = today.getDate();
+      const currentMonth = today.getMonth() + 1;
+      const currentYear = today.getFullYear();
+      
+      // If it's the selected month/year and past 10th day, mark as due
+      if (currentMonth === parseInt(selectedMonth) && currentYear === selectedYear && dayOfMonth > 10) {
+        status = "due";
+      }
+    }
+    
+    return { isPaid, amount: totalPaid, payments: studentPayments, status };
   };
 
   const filteredStudents = useMemo(() => {
-    return activeStudents.filter((student) =>
-      student.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [activeStudents, searchQuery]);
+    return activeStudents.filter((student) => {
+      const matchesSearch =
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.roll.includes(searchQuery);
+
+      const matchesClass = filterClass === "all" || student.class === filterClass;
+      const matchesBatch = filterBatch === "all" || student.batch === filterBatch;
+
+      const paymentStatus = getPaymentStatus(student.id);
+      const matchesPayment =
+        filterPayment === "all" || paymentStatus.status === filterPayment;
+
+      return matchesSearch && matchesClass && matchesBatch && matchesPayment;
+    });
+  }, [activeStudents, searchQuery, filterClass, filterBatch, filterPayment, payments]);
 
   const handleAddPayment = (student: Student) => {
     setPaymentConfirmStudent(student);
@@ -358,7 +390,43 @@ export function FinanceSystem() {
             searchPlaceholder="শিক্ষার্থী খুঁজুন..."
             searchValue={searchQuery}
             onSearchChange={setSearchQuery}
-            filters={[]}
+            filters={[
+              {
+                id: "class",
+                label: "ক্লাস",
+                value: filterClass,
+                onChange: setFilterClass,
+                options: [
+                  { value: "all", label: "সব" },
+                  ...classes.map((c) => ({ value: c.name, label: c.name })),
+                ],
+              },
+              {
+                id: "batch",
+                label: "ব্যাচ",
+                value: filterBatch,
+                onChange: setFilterBatch,
+                options: [
+                  { value: "all", label: "সব" },
+                  { value: "সকাল", label: "সকাল" },
+                  { value: "দুপুর", label: "দুপুর" },
+                  { value: "বিকাল", label: "বিকাল" },
+                  { value: "সন্ধ্যা", label: "সন্ধ্যা" },
+                ],
+              },
+              {
+                id: "payment",
+                label: "পেমেন্ট স্ট্যাটাস",
+                value: filterPayment,
+                onChange: setFilterPayment,
+                options: [
+                  { value: "all", label: "সব" },
+                  { value: "paid", label: "পেমেন্ট করা" },
+                  { value: "due", label: "বকেয়া" },
+                  { value: "pending", label: "অপেক্ষমাণ" },
+                ],
+              },
+            ]}
           />
 
           <div className="space-y-3">

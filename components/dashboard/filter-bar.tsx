@@ -97,16 +97,15 @@ export function FilterBar({
       {showFilters && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg border border-border">
           {filters.map((filter) => (
-            <div key={filter.id} className="space-y-2">
+            <div key={filter.label} className="space-y-2">
               <label className="text-sm font-medium">{filter.label}</label>
               <Select value={filter.value} onValueChange={filter.onChange}>
                 <SelectTrigger className="text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">সব</SelectItem>
                   {filter.options.map((option) => (
-                    <SelectItem key={option.id} value={option.value}>
+                    <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
                   ))}
