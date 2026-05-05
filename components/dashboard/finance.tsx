@@ -101,14 +101,14 @@ export function FinanceSystem() {
 
   // Calculate monthly stats
   const monthlyStats = useMemo(() => {
-    const monthStart = startOfMonth(new Date(selectedYear, parseInt(selectedMonth) - 1));
-    const monthEnd = endOfMonth(monthStart);
-
+    // Filter payments by selected month and year fields
     const monthPayments = payments.filter((p) => {
-      const paidDate = parseISO(p.paidDate);
-      return isWithinInterval(paidDate, { start: monthStart, end: monthEnd });
+      return p.month === selectedMonth && p.year === selectedYear;
     });
 
+    // Filter expenses by date range
+    const monthStart = startOfMonth(new Date(selectedYear, parseInt(selectedMonth) - 1));
+    const monthEnd = endOfMonth(monthStart);
     const monthExpenses = expenses.filter((e) => {
       const expenseDate = parseISO(e.date);
       return isWithinInterval(expenseDate, { start: monthStart, end: monthEnd });
@@ -153,6 +153,7 @@ export function FinanceSystem() {
 
   const confirmAddPayment = async () => {
     if (!paymentConfirmStudent || paymentAmount <= 0) return;
+    // Payment date is today, but will be categorized by selected month/year
     await addPayment({
       studentId: paymentConfirmStudent.id,
       amount: paymentAmount,

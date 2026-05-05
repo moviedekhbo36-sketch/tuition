@@ -19,7 +19,33 @@ import {
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns";
 import { bn } from "date-fns/locale";
 
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
+const COLORS = [
+  "#3B82F6", // Vibrant Blue
+  "#10B981", // Emerald Green
+  "#F59E0B", // Amber Yellow
+  "#EF4444", // Bright Red
+  "#8B5CF6", // Violet Purple
+  "#EC4899", // Pink
+  "#06B6D4", // Cyan
+  "#6366F1", // Indigo
+  "#14B8A6", // Teal
+  "#F97316", // Orange
+];
+
+const CustomBar = (props: any) => {
+  const { fill, x, y, width, height, payload } = props;
+  return (
+    <rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fill={payload?.fill || "#3B82F6"}
+      rx={4}
+      ry={4}
+    />
+  );
+};
 
 export function DashboardOverview() {
   const { students, payments, expenses, attendance } = useFirebase();
@@ -32,8 +58,28 @@ export function DashboardOverview() {
   const currentMonth = new Date();
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
+  const currentYear = new Date().getFullYear();
 
-  // Calculate monthly income
+  // Calculate yearly income
+  const yearlyIncome = useMemo(() => {
+    return payments
+      .filter((p) => p.year === currentYear)
+      .reduce((sum, p) => sum + p.amount, 0);
+  }, [payments, currentYear]);
+
+  // Calculate yearly expenses
+  const yearlyExpenses = useMemo(() => {
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearEnd = new Date(currentYear, 11, 31);
+    return expenses
+      .filter((e) => {
+        const expenseDate = parseISO(e.date);
+        return isWithinInterval(expenseDate, { start: yearStart, end: yearEnd });
+      })
+      .reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses, currentYear]);
+
+  // Calculate monthly income (for current month)
   const monthlyIncome = useMemo(() => {
     return payments
       .filter((p) => {
@@ -98,17 +144,25 @@ export function DashboardOverview() {
     return Math.round((present / attendance.length) * 100);
   }, [attendance]);
 
-  // Batch distribution
-  const batchDistribution = useMemo(() => {
+  // Class distribution
+  const classDistribution = useMemo(() => {
     const distribution: Record<string, number> = {};
     activeStudents.forEach((s) => {
-      distribution[s.batch] = (distribution[s.batch] || 0) + 1;
+      distribution[s.class] = (distribution[s.class] || 0) + 1;
     });
     return Object.entries(distribution).map(([name, value]) => ({ name, value }));
   }, [activeStudents]);
 
-  // Last 6 months income data
+  // Last 6 months income data with colors
   const incomeChart = useMemo(() => {
+    const chartColors = [
+      "#3B82F6", // Vibrant Blue
+      "#10B981", // Emerald Green
+      "#F59E0B", // Amber Yellow
+      "#EF4444", // Bright Red
+      "#8B5CF6", // Violet Purple
+      "#EC4899", // Pink
+    ];
     const data = [];
     for (let i = 5; i >= 0; i--) {
       const month = new Date();
@@ -120,7 +174,7 @@ export function DashboardOverview() {
         .filter((p) => `${p.year}-${String(p.month).padStart(2, "0")}` === monthStr)
         .reduce((sum, p) => sum + p.amount, 0);
 
-      data.push({ name: monthName, income });
+      data.push({ name: monthName, income, fill: chartColors[5 - i] });
     }
     return data;
   }, [payments]);
@@ -141,8 +195,8 @@ export function DashboardOverview() {
       bgColor: "bg-chart-2/10",
     },
     {
-      title: "এই মাসের আয়",
-      value: `৳${monthlyIncome.toLocaleString("bn-BD")}`,
+      title: "এই বছরের আয়",
+      value: `৳${yearlyIncome.toLocaleString("bn-BD")}`,
       icon: TrendingUp,
       color: "text-chart-3",
       bgColor: "bg-chart-3/10",
@@ -231,24 +285,28 @@ export function DashboardOverview() {
                     }}
                     formatter={(value: number) => [`৳${value.toLocaleString("bn-BD")}`, "আয়"]}
                   />
-                  <Bar dataKey="income" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  <Bar 
+                    dataKey="income" 
+                    radius={[4, 4, 0, 0]}
+                    shape={CustomBar}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        {/* Batch Distribution */}
+        {/* Class Distribution */}
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg">ব্যাচ অনুযায়ী শিক্ষার্থী</CardTitle>
+            <CardTitle className="text-lg">ক্লাস অনুযায়ী শিক্ষার্থী</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={batchDistribution}
+                    data={classDistribution}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -257,7 +315,7 @@ export function DashboardOverview() {
                     dataKey="value"
                     label={({ name, value }) => `${name}: ${value}`}
                   >
-                    {batchDistribution.map((_, index) => (
+                    {classDistribution.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -278,7 +336,7 @@ export function DashboardOverview() {
       {/* Financial Summary */}
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">এই মাসের আর্থিক সারসংক্ষেপ</CardTitle>
+          <CardTitle className="text-lg">এই বছরের আর্থিক সারসংক্ষেপ</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -286,14 +344,14 @@ export function DashboardOverview() {
               <TrendingUp className="w-10 h-10 text-chart-3" />
               <div>
                 <p className="text-sm text-muted-foreground">মোট আয়</p>
-                <p className="text-xl font-bold">৳{monthlyIncome.toLocaleString("bn-BD")}</p>
+                <p className="text-xl font-bold">৳{yearlyIncome.toLocaleString("bn-BD")}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-xl bg-destructive/10">
               <TrendingDown className="w-10 h-10 text-destructive" />
               <div>
                 <p className="text-sm text-muted-foreground">মোট খরচ</p>
-                <p className="text-xl font-bold">৳{monthlyExpenses.toLocaleString("bn-BD")}</p>
+                <p className="text-xl font-bold">৳{yearlyExpenses.toLocaleString("bn-BD")}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-xl bg-chart-1/10">
@@ -301,7 +359,7 @@ export function DashboardOverview() {
               <div>
                 <p className="text-sm text-muted-foreground">নিট লাভ</p>
                 <p className="text-xl font-bold">
-                  ৳{(monthlyIncome - monthlyExpenses).toLocaleString("bn-BD")}
+                  ৳{(yearlyIncome - yearlyExpenses).toLocaleString("bn-BD")}
                 </p>
               </div>
             </div>
