@@ -86,8 +86,14 @@ export function StudentManagement() {
     return "pending";
   };
 
+  // Helper function to extract class number for sorting
+  const getClassNumber = (classStr: string): number => {
+    const match = classStr.match(/\d+/);
+    return match ? parseInt(match[0]) : 0;
+  };
+
   const filteredStudents = useMemo(() => {
-    return activeStudents.filter((student) => {
+    const filtered = activeStudents.filter((student) => {
       const matchesSearch =
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.roll.includes(searchQuery);
@@ -99,6 +105,21 @@ export function StudentManagement() {
         filterPayment === "all" || paymentStatus === filterPayment;
 
       return matchesSearch && matchesClass && matchesPayment;
+    });
+
+    // Sort by class (numerical) and then by roll number
+    return filtered.sort((a, b) => {
+      const classNumA = getClassNumber(a.class);
+      const classNumB = getClassNumber(b.class);
+      
+      if (classNumA !== classNumB) {
+        return classNumA - classNumB;
+      }
+      
+      // If same class, sort by roll number
+      const rollA = parseInt(a.roll) || 0;
+      const rollB = parseInt(b.roll) || 0;
+      return rollA - rollB;
     });
   }, [activeStudents, searchQuery, filterClass, filterPayment, payments]);
 
