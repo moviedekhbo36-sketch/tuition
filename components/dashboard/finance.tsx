@@ -465,7 +465,7 @@ export function FinanceSystem() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {student.class} | ফি: ৳{student.monthlyFee}
+                            রোল: {student.roll} | ক্লাস: {student.class} | ফি: ৳{student.monthlyFee}
                           </p>
                         </div>
                       </div>
