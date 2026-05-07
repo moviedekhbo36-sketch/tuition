@@ -3,6 +3,7 @@ import { Hind_Siliguri, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { FirebaseProvider } from "@/lib/firebase-context";
+import { ExitConfirmation } from "@/components/exit-confirmation";
 import "./globals.css";
 
 const hindSiliguri = Hind_Siliguri({
@@ -64,7 +65,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseProvider>{children}</FirebaseProvider>
+          <FirebaseProvider>
+            <ExitConfirmation />
+            {children}
+          </FirebaseProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
