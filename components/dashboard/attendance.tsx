@@ -23,7 +23,7 @@ import {
   MessageSquare,
   Search,
 } from "lucide-react";
-import { format, parseISO, differenceInDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, differenceInDays, startOfMonth, endOfMonth, isLastDayOfMonth } from "date-fns";
 import { bn } from "date-fns/locale";
 
 export function AttendanceSystem() {
@@ -59,9 +59,10 @@ export function AttendanceSystem() {
     return Math.round((presentDays / studentAttendance.length) * 100);
   };
 
-  // Check consecutive absent days
+  // Check consecutive absent days up to selected date
   const getConsecutiveAbsentDays = (studentId: string) => {
     const studentAttendance = getAttendanceByStudent(studentId)
+      .filter((a) => new Date(a.date).getTime() <= new Date(selectedDate).getTime())
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     let consecutiveDays = 0;
@@ -92,6 +93,10 @@ export function AttendanceSystem() {
     return record?.status;
   };
 
+  const isLastDayOfSelectedMonth = () => {
+    return isLastDayOfMonth(parseISO(selectedDate));
+  };
+
   const handleMarkAttendance = async (studentId: string, status: "present" | "absent") => {
     await markAttendance(studentId, selectedDate, status);
   };
@@ -106,7 +111,17 @@ export function AttendanceSystem() {
 
     // English pre-filled message
     const message = encodeURIComponent(
-      `Dear Guardian,\n${student.name} was absent for ${monthlyAbsent} days in ${currentMonth}. Please ensure regular attendance.\n\nRegards,\nAST Tuition`
+      `${student.name} was absent for ${monthlyAbsent} days in ${currentMonth}. Please ensure regular attendance.`
+    );
+    window.location.href = `sms:${student.guardianPhone}?body=${message}`;
+  };
+
+  const handleSendDayAbsenceMessage = (student: typeof activeStudents[0], date: string) => {
+    const dayName = format(parseISO(date), "EEEE, MMMM d, yyyy");
+
+    // English pre-filled message for specific day
+    const message = encodeURIComponent(
+      `${student.name} was absent on ${dayName}. Please ensure regular attendance.`
     );
     window.location.href = `sms:${student.guardianPhone}?body=${message}`;
   };
@@ -273,14 +288,141 @@ export function AttendanceSystem() {
                                 ক্লিয়ার
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              onClick={() => handleSendAbsenceMessage(student)}
-                              className="bg-destructive hover:bg-destructive/90 text-white"
+                            {status === "absent" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendDayAbsenceMessage(student, selectedDate)}
+                                className="bg-chart-3 hover:bg-chart-3/90 text-white"
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                এই দিনের বার্তা
+                              </Button>
+                            )}
+                            {isLastDayOfSelectedMonth() && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendAbsenceMessage(student)}
+                                className="bg-destructive hover:bg-destructive/90 text-white"
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                মাসিক বার্তা
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* 1 Day Absent - SMS Notification */}
+        {filteredStudents.filter((s) => {
+          const consecutiveAbsent = getConsecutiveAbsentDays(s.id);
+          return consecutiveAbsent === 1;
+        }).length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold mb-3">১ দিন অনুপস্থিত - বার্তা পাঠান</h3>
+            <div className="space-y-2">
+              {filteredStudents
+                .filter((s) => getConsecutiveAbsentDays(s.id) === 1)
+                .map((student) => {
+                  const status = getStudentStatus(student.id);
+                  const attendancePercent = getAttendancePercentage(student.id);
+
+                  return (
+                    <Card key={student.id} className="border-border/50">
+                      <CardContent className="p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                                status === "present"
+                                  ? "bg-chart-2/20"
+                                  : status === "absent"
+                                  ? "bg-destructive/20"
+                                  : "bg-muted"
+                              }`}
                             >
-                              <MessageSquare className="w-4 h-4 mr-2" />
-                              অভিভাবককে জানান
+                              <span
+                                className={`text-lg font-bold ${
+                                  status === "present"
+                                    ? "text-chart-2"
+                                    : status === "absent"
+                                    ? "text-destructive"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {student.name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">{student.name}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                ক্লাস: {student.class} | ব্যাচ: {student.batch} | অ্যাটেনডেন্স: {attendancePercent}%
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant={status === "present" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleMarkAttendance(student.id, "present")}
+                              className={
+                                status === "present"
+                                  ? "bg-chart-2 hover:bg-chart-2/90"
+                                  : "hover:bg-chart-2/10 hover:text-chart-2 hover:border-chart-2"
+                              }
+                            >
+                              <Check className="w-4 h-4 mr-1" />
+                              উপস্থিত
                             </Button>
+                            <Button
+                              variant={status === "absent" ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handleMarkAttendance(student.id, "absent")}
+                              className={
+                                status === "absent"
+                                  ? "bg-destructive hover:bg-destructive/90"
+                                  : "hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                              }
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              অনুপস্থিত
+                            </Button>
+                            {status && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleClearAttendance(student.id)}
+                                className="hover:bg-muted hover:text-muted-foreground"
+                              >
+                                <RotateCcw className="w-4 h-4 mr-1" />
+                                ক্লিয়ার
+                              </Button>
+                            )}
+                            {status === "absent" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendDayAbsenceMessage(student, selectedDate)}
+                                className="bg-chart-3 hover:bg-chart-3/90 text-white"
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                এই দিনের বার্তা
+                              </Button>
+                            )}
+                            {isLastDayOfSelectedMonth() && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleSendAbsenceMessage(student)}
+                                className="bg-destructive hover:bg-destructive/90 text-white"
+                              >
+                                <MessageSquare className="w-4 h-4 mr-2" />
+                                মাসিক বার্তা
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -293,11 +435,17 @@ export function AttendanceSystem() {
 
         {/* All Students */}
         <div>
-          {filteredStudents.filter((s) => getConsecutiveAbsentDays(s.id) < 3).length > 0 && (
+          {filteredStudents.filter((s) => {
+            const consecutiveAbsent = getConsecutiveAbsentDays(s.id);
+            return consecutiveAbsent !== 1 && consecutiveAbsent < 3;
+          }).length > 0 && (
             <h3 className="font-semibold mb-3">সাধারণ শিক্ষার্থী</h3>
           )}
           {filteredStudents
-            .filter((s) => getConsecutiveAbsentDays(s.id) < 3)
+            .filter((s) => {
+              const consecutiveAbsent = getConsecutiveAbsentDays(s.id);
+              return consecutiveAbsent !== 1 && consecutiveAbsent < 3;
+            })
             .map((student) => {
               const status = getStudentStatus(student.id);
               const attendancePercent = getAttendancePercentage(student.id);
@@ -371,6 +519,26 @@ export function AttendanceSystem() {
                           >
                             <RotateCcw className="w-4 h-4 mr-1" />
                             ক্লিয়ার
+                          </Button>
+                        )}
+                        {status === "absent" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendDayAbsenceMessage(student, selectedDate)}
+                            className="bg-chart-3 hover:bg-chart-3/90 text-white"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            এই দিনের বার্তা
+                          </Button>
+                        )}
+                        {isLastDayOfSelectedMonth() && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleSendAbsenceMessage(student)}
+                            className="bg-destructive hover:bg-destructive/90 text-white"
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            মাসিক বার্তা
                           </Button>
                         )}
                       </div>
